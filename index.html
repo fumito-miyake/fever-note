@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>みんなで体温記録</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #4a90e2; --danger: #e53e3e; --success: #38a169;
+            --bg: #edf2f7; --card: #ffffff; --text: #2d3748;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+        .container { width: 100%; max-width: 600px; margin: 0 auto; padding: 16px; box-sizing: border-box; }
+        
+        header { 
+            background: var(--primary); color: white; 
+            padding: 8px 15px; 
+            text-align: center; position: sticky; top: 0; z-index: 100; 
+            min-height: 44px;
+            display: flex; align-items: center; justify-content: center; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            transition: background-color 0.3s ease;
+        }
+        header h1 { margin: 0; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        
+        .card { 
+            background: var(--card); border-radius: 12px; padding: 16px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); 
+            border: 1px solid rgba(0,0,0,0.05);
+            margin-bottom: 16px; 
+        }
+        h2 { margin: 0 0 12px 0; font-size: 0.85rem; color: #4a5568; border-bottom: 2px solid #edf2f7; padding-bottom: 8px; font-weight: bold; }
+        
+        .btn { display: block; padding: 12px; border: none; border-radius: 8px; background: var(--primary); color: white; font-weight: bold; cursor: pointer; width: 100%; font-size: 0.95rem; text-align: center; box-sizing: border-box; }
+        .btn:active { opacity: 0.7; }
+        .btn-sm { padding: 6px 10px; font-size: 0.75rem; width: auto; display: inline-block; }
+        .btn-danger { background: var(--danger); }
+        .btn-outline { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+        .btn-secondary { background: #718096; }
+        
+        .user-tag { 
+            display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; 
+            color: white; margin-right: 6px; cursor: pointer; border: 2px solid transparent;
+            transition: all 0.2s ease;
+            opacity: 1;
+            touch-action: manipulation;
+        }
+        .user-tag:active { transform: scale(0.9); }
+        .tag-inactive { opacity: 0.35; transform: scale(0.95); }
+        .user-tag.selected { border-color: rgba(0,0,0,0.2); transform: scale(1.05); font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .user-tag.filter-active { border-color: rgba(0,0,0,0.2); font-weight: bold; transform: scale(1.05); }
+
+        .tag-selector { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+        .add-tag-btn { 
+            width: 34px; height: 34px; border-radius: 50%; border: 2px dashed #cbd5e0; 
+            display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.2rem; color: #718096;
+            background: white;
+        }
+
+        input { width: 100%; padding: 12px; margin: 4px 0 12px 0; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; font-size: 1rem; background: #fff; user-select: text; -webkit-user-select: text; }
+        
+        .month-divider { font-size: 0.8rem; font-weight: bold; color: #718096; margin: 16px 4px 8px 4px; display: flex; align-items: center; gap: 10px; }
+        .month-divider::after { content: ""; flex: 1; height: 1px; background: #cbd5e0; }
+
+        .event-item { 
+            display: flex; align-items: stretch; background: white; margin-bottom: 12px; border-radius: 12px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow: hidden;
+        }
+        .event-date-side { 
+            width: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: #f7fafc; border-right: 1px solid #edf2f7; color: #4a5568;
+        }
+        .event-day { font-size: 1.1rem; font-weight: 900; }
+        .event-dow { font-size: 0.6rem; font-weight: bold; }
+        .event-content { flex: 1; padding: 10px 12px; cursor: pointer; }
+        
+        .page { display: none; }
+        .page.active { display: block; }
+        .chart-container { height: 260px; margin: 4px 0; position: relative; width: 100%; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 4px; border-bottom: 1px solid #edf2f7; text-align: left; font-size: 0.85rem; }
+        .back-link { color: white; text-decoration: none; position: absolute; left: 12px; font-size: 1.4rem; padding: 0 10px; cursor: pointer; }
+        
+        #record-period { font-size: 0.7rem; color: rgba(255,255,255,0.9); margin-top: 1px; font-weight: normal; }
+        #detail-user-prefix { font-weight: 900; opacity: 0.95; margin-right: 4px; border-right: 1px solid rgba(255,255,255,0.4); padding-right: 8px; }
+
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(2px);
+        }
+
+        .color-picker { display: flex; flex-wrap: wrap; gap: 12px; margin: 15px 0; }
+        .color-opt { width: 34px; height: 34px; border-radius: 50%; cursor: pointer; border: 3px solid white; box-shadow: 0 0 0 1px #cbd5e0; }
+        .color-opt.selected { box-shadow: 0 0 0 2px #2d3748; }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; color: black; }
+            .container { max-width: 100%; padding: 0; margin: 0; }
+            .card { box-shadow: none; border: 1px solid #ccc; margin-bottom: 20px; padding: 15px; border-radius: 0; }
+            header { background: #eee !important; color: black !important; position: relative; border-bottom: 2px solid #333; min-height: auto; }
+            #record-period { color: #333; font-weight: bold; font-size: 10pt; }
+            .chart-container { height: 350px !important; width: 100% !important; margin-bottom: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Page: List -->
+<div id="page-list" class="page active">
+    <header id="list-header"><h1>みんなで体温記録</h1></header>
+    <div class="container">
+        <!-- New Event Creation -->
+        <div class="card">
+            <div style="display:flex; justify-content: space-between; align-items: baseline;">
+                <h2>新しいイベント</h2>
+                <span style="font-size: 0.6rem; color: #a0aec0;">長押しで対象者を削除</span>
+            </div>
+            <div class="tag-selector" id="create-tag-selector">
+                <div class="add-tag-btn" onclick="app.openUserModal()">+</div>
+            </div>
+            <input type="text" id="new-event-name" placeholder="内容 (例: 発熱、ワクチンの副反応など)">
+            <button class="btn" id="create-btn" onclick="app.createEvent()">記録を開始</button>
+        </div>
+        
+        <!-- Event List -->
+        <div class="card" style="background: transparent; box-shadow: none; border: none; padding: 0;">
+            <h2 style="padding: 0 4px 8px 4px;">イベント一覧</h2>
+            <div class="tag-selector" id="filter-tag-selector" style="padding: 0 4px 8px 4px;">
+                <!-- Filter Tags -->
+            </div>
+            <div id="event-list-container"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Page: Detail -->
+<div id="page-detail" class="page">
+    <header id="detail-header">
+        <span class="back-link no-print" onclick="app.navigate('page-list')">‹</span>
+        <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+            <h1>
+                <span id="detail-user-prefix"></span>
+                <span id="current-event-title">詳細</span>
+                <button class="no-print" onclick="app.renameEvent()" style="background:none; border:none; color:white; padding-left:4px; opacity:0.7; cursor:pointer;">
+                    <svg style="width:14px;height:14px;fill:currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                </button>
+            </h1>
+            <div id="record-period"></div>
+        </div>
+    </header>
+    <div class="container">
+        <!-- Input Section -->
+        <div class="card no-print">
+            <div style="display: flex; gap: 8px;">
+                <input type="datetime-local" id="record-date" style="flex: 1.6;">
+                <input type="number" id="record-temp" step="0.1" placeholder="36.5" style="flex: 1;">
+            </div>
+            <button class="btn" id="add-record-btn" onclick="app.addTempRecord()">記録を追加</button>
+        </div>
+
+        <!-- Chart Section -->
+        <div class="card">
+            <div class="chart-container">
+                <canvas id="tempChart"></canvas>
+            </div>
+        </div>
+
+        <!-- History Table Section -->
+        <div class="card">
+            <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h2 style="margin:0; border:none; padding:0;">履歴</h2>
+                <button class="btn btn-sm btn-success no-print" onclick="window.print()">印刷 / PDF</button>
+            </div>
+            <table>
+                <thead><tr><th>日時</th><th>体温</th><th class="no-print">操作</th></tr></thead>
+                <tbody id="record-tbody"></tbody>
+            </table>
+            <div style="margin-top: 24px;" class="no-print">
+                <button class="btn btn-danger" style="background: #a0aec0; font-size: 0.8rem; padding: 10px;" onclick="app.deleteCurrentEvent()">このイベントを削除</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: User Registration -->
+<div id="user-modal" class="modal">
+    <div class="card" style="width: 85%; max-width: 400px;">
+        <h2>新しい人を登録</h2>
+        <input type="text" id="new-user-name" placeholder="名前">
+        <div style="font-size: 0.8rem; margin-bottom: 5px; color:#4a5568; font-weight:bold;">カラーを選択</div>
+        <div class="color-picker" id="color-picker"></div>
+        <div style="display:flex; gap:12px; margin-top: 10px;">
+            <button class="btn btn-secondary" onclick="app.closeUserModal()">キャンセル</button>
+            <button class="btn" onclick="app.addUser()">登録</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Record -->
+<div id="edit-modal" class="modal">
+    <div class="card" style="width: 85%; max-width: 400px;">
+        <h2>記録の編集</h2>
+        <label style="font-size: 0.75rem; color: #718096;">日時</label>
+        <input type="datetime-local" id="edit-date">
+        <label style="font-size: 0.75rem; color: #718096;">体温 (℃)</label>
+        <input type="number" id="edit-temp" step="0.1">
+        <div style="display:flex; gap:12px; margin-top: 10px;">
+            <button class="btn btn-secondary" onclick="app.closeModal()">キャンセル</button>
+            <button class="btn" onclick="app.saveEdit()">保存</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 黄色 (#ecc94b) を選択肢から削除
+    const COLORS = ['#ed64a6', '#48bb78', '#9f7aea', '#ed8936', '#38b2ac', '#667eea', '#f56565'];
+    const DOW = ["日", "月", "火", "水", "木", "金", "土"];
+
+    const app = {
+        users: JSON.parse(localStorage.getItem('temp_v22_users')) || [],
+        events: JSON.parse(localStorage.getItem('temp_v22_events')) || [],
+        currentEventId: null,
+        selectedUserIdForNewEvent: null,
+        filterUserIds: [], 
+        selectedColor: COLORS[0],
+        chart: null,
+        longPressTimer: null,
+
+        save: function() {
+            localStorage.setItem('temp_v22_users', JSON.stringify(this.users));
+            localStorage.setItem('temp_v22_events', JSON.stringify(this.events));
+        },
+
+        navigate: function(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            if (pageId === 'page-list') this.renderList();
+            else this.renderDetail();
+        },
+
+        openUserModal: function() {
+            const picker = document.getElementById('color-picker');
+            picker.innerHTML = '';
+            COLORS.forEach(c => {
+                const opt = document.createElement('div');
+                opt.className = 'color-opt' + (c === this.selectedColor ? ' selected' : '');
+                opt.style.background = c;
+                opt.onclick = () => { this.selectedColor = c; this.openUserModal(); };
+                picker.appendChild(opt);
+            });
+            document.getElementById('user-modal').style.display = 'flex';
+        },
+        closeUserModal: function() { document.getElementById('user-modal').style.display = 'none'; },
+        addUser: function() {
+            const name = document.getElementById('new-user-name').value.trim();
+            if (!name) return;
+            const newUser = { id: Date.now(), name, color: this.selectedColor };
+            this.users.push(newUser);
+            this.save();
+            document.getElementById('new-user-name').value = '';
+            this.closeUserModal();
+            this.renderList();
+        },
+
+        deleteUser: function(userId) {
+            const user = this.users.find(u => u.id === userId);
+            if (!user) return;
+            if (confirm(`「${user.name}」さんをリストから削除しますか？\n（過去の記録は消えません）`)) {
+                this.users = this.users.filter(u => u.id !== userId);
+                if (this.selectedUserIdForNewEvent === userId) this.selectedUserIdForNewEvent = null;
+                this.filterUserIds = this.filterUserIds.filter(id => id !== userId);
+                this.save();
+                this.renderList();
+            }
+        },
+
+        createEvent: function() {
+            const input = document.getElementById('new-event-name');
+            const name = input.value.trim() || "体温記録";
+            if (!this.selectedUserIdForNewEvent) {
+                alert("誰の記録か選択してください");
+                return;
+            }
+            const newEv = { 
+                id: Date.now(), 
+                userId: this.selectedUserIdForNewEvent,
+                name: name, 
+                createdAt: new Date().toISOString(),
+                records: [] 
+            };
+            this.events.push(newEv);
+            this.save();
+            input.value = '';
+            this.currentEventId = newEv.id;
+            this.navigate('page-detail');
+        },
+
+        toggleFilter: function(userId) {
+            const index = this.filterUserIds.indexOf(userId);
+            if (index > -1) {
+                this.filterUserIds.splice(index, 1);
+            } else {
+                this.filterUserIds.push(userId);
+            }
+            this.renderList();
+        },
+
+        renderList: function() {
+            const createSelector = document.getElementById('create-tag-selector');
+            createSelector.innerHTML = '';
+            this.users.forEach(u => {
+                const span = document.createElement('span');
+                const isSelected = this.selectedUserIdForNewEvent === u.id;
+                span.className = 'user-tag' + (isSelected ? ' selected' : '') + (this.selectedUserIdForNewEvent && !isSelected ? ' tag-inactive' : '');
+                span.style.background = u.color;
+                span.textContent = u.name;
+                
+                const handleStart = () => {
+                    this.longPressTimer = setTimeout(() => {
+                        this.deleteUser(u.id);
+                        this.longPressTimer = null;
+                    }, 800);
+                };
+                const handleEnd = (e) => {
+                    if (this.longPressTimer) {
+                        clearTimeout(this.longPressTimer);
+                        this.longPressTimer = null;
+                        this.selectedUserIdForNewEvent = u.id; 
+                        this.renderList();
+                    }
+                };
+                
+                span.onmousedown = handleStart;
+                span.onmouseup = handleEnd;
+                span.ontouchstart = (e) => { e.preventDefault(); handleStart(); };
+                span.ontouchend = handleEnd;
+
+                createSelector.appendChild(span);
+            });
+            const addBtn = document.createElement('div');
+            addBtn.className = 'add-tag-btn';
+            addBtn.textContent = '+';
+            addBtn.onclick = () => this.openUserModal();
+            createSelector.appendChild(addBtn);
+
+            const selUser = this.users.find(u => u.id === this.selectedUserIdForNewEvent);
+            document.getElementById('create-btn').style.background = selUser ? selUser.color : 'var(--primary)';
+
+            const filterSelector = document.getElementById('filter-tag-selector');
+            filterSelector.innerHTML = '';
+            this.users.forEach(u => {
+                const span = document.createElement('span');
+                const isActive = this.filterUserIds.includes(u.id);
+                span.className = 'user-tag' + (isActive ? ' filter-active' : '');
+                span.style.background = u.color;
+                span.style.opacity = (this.filterUserIds.length === 0 || isActive) ? 1 : 0.4;
+                span.textContent = u.name;
+                span.onclick = () => this.toggleFilter(u.id);
+                filterSelector.appendChild(span);
+            });
+
+            const container = document.getElementById('event-list-container');
+            container.innerHTML = '';
+            
+            let filtered = [...this.events];
+            if (this.filterUserIds.length > 0) {
+                filtered = filtered.filter(e => this.filterUserIds.includes(e.userId));
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#718096; margin:30px 0; font-size:0.85rem;">表示するデータがありません</p>';
+                return;
+            }
+
+            filtered.sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
+
+            let lastMonthStr = "";
+            filtered.forEach(ev => {
+                const date = new Date(ev.createdAt || ev.id);
+                const monthStr = `${date.getFullYear()}年${date.getMonth() + 1}月`;
+                
+                if (monthStr !== lastMonthStr) {
+                    const divider = document.createElement('div');
+                    divider.className = 'month-divider';
+                    divider.textContent = monthStr;
+                    container.appendChild(divider);
+                    lastMonthStr = monthStr;
+                }
+
+                const user = this.users.find(u => u.id === ev.userId);
+                const item = document.createElement('div');
+                item.className = 'event-item';
+                item.innerHTML = `
+                    <div class="event-date-side">
+                        <div class="event-day">${date.getDate()}</div>
+                        <div class="event-dow">${DOW[date.getDay()]}</div>
+                    </div>
+                    <div class="event-content" onclick="app.viewDetail(${ev.id})">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="display:inline-block; padding: 1px 6px; border-radius:10px; font-size:0.6rem; color:white; background:${user ? user.color : '#ccc'}">${user ? user.name : '?'}</span>
+                            <span style="font-weight:bold; font-size: 0.85rem;">${ev.name}</span>
+                        </div>
+                        <div style="font-size:0.7rem; color:#a0aec0; margin-top:2px;">データ: ${ev.records.length}件</div>
+                    </div>
+                    <div style="display:flex; align-items:center; padding-right:10px;" class="no-print">
+                        <button class="btn btn-sm" style="padding:4px 8px; font-size:0.6rem; background:#edf2f7; color:#718096; border:1px solid #e2e8f0;" onclick="app.deleteEventFromList(${ev.id})">削除</button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        },
+
+        viewDetail: function(id) { this.currentEventId = id; this.navigate('page-detail'); },
+
+        renderDetail: function() {
+            const ev = this.events.find(e => e.id == this.currentEventId);
+            if (!ev) return;
+            const user = this.users.find(u => u.id === ev.userId);
+            
+            const detailHeader = document.getElementById('detail-header');
+            const userPrefixEl = document.getElementById('detail-user-prefix');
+            
+            if (user) {
+                detailHeader.style.backgroundColor = user.color;
+                userPrefixEl.textContent = user.name;
+                userPrefixEl.style.display = 'inline-block';
+            } else {
+                detailHeader.style.backgroundColor = 'var(--primary)';
+                userPrefixEl.style.display = 'none';
+            }
+            
+            document.getElementById('current-event-title').textContent = ev.name;
+            document.getElementById('add-record-btn').style.background = user ? user.color : '#4a90e2';
+
+            const tbody = document.getElementById('record-tbody');
+            tbody.innerHTML = '';
+            
+            const periodEl = document.getElementById('record-period');
+            if (ev.records && ev.records.length > 0) {
+                const sortedRecords = [...ev.records].sort((a,b) => new Date(a.date) - new Date(b.date));
+                const sDate = new Date(sortedRecords[0].date);
+                const eDate = new Date(sortedRecords[sortedRecords.length - 1].date);
+                const formatDate = (d) => `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+                periodEl.textContent = `${formatDate(sDate)} 〜 ${formatDate(eDate)}`;
+                periodEl.style.display = 'block';
+            } else {
+                const cDate = new Date(ev.createdAt || ev.id);
+                periodEl.textContent = `${cDate.getFullYear()}年${cDate.getMonth()+1}月${cDate.getDate()}日`;
+                periodEl.style.display = 'block';
+            }
+
+            [...ev.records].reverse().forEach(r => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${r.date.replace('T', ' ')}</td>
+                    <td style="font-weight:bold; color:${r.temp >= 37.5 ? 'var(--danger)' : 'inherit'}">${r.temp.toFixed(1)}℃</td>
+                    <td class="no-print" style="white-space:nowrap;">
+                        <button class="btn btn-sm btn-outline" style="border-color:#cbd5e0; color:#718096;" onclick="app.openEdit(${r.id})">編集</button>
+                        <button class="btn btn-sm btn-danger" style="padding: 6px 8px;" onclick="app.deleteRecord(${r.id})">×</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            this.updateChart(ev.records, user ? user.color : '#4a90e2');
+        },
+
+        updateChart: function(records, color) {
+            const canvas = document.getElementById('tempChart');
+            const ctx = canvas.getContext('2d');
+            if (this.chart) this.chart.destroy();
+
+            const sorted = records && records.length > 0 
+                ? [...records].sort((a,b) => new Date(a.date) - new Date(b.date))
+                : [];
+
+            const labels = sorted.length > 0 ? sorted.map(r => r.date.split('T')[1]) : ['記録なし'];
+            const temps = sorted.length > 0 ? sorted.map(r => r.temp) : [null];
+
+            this.chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: temps,
+                        borderColor: color,
+                        backgroundColor: color + '22',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#fff',
+                        pointBorderWidth: 2,
+                        zIndex: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 35, max: 41,
+                            ticks: {
+                                stepSize: 0.5,
+                                color: (ctx) => (ctx.tick && ctx.tick.value === 37.5) ? '#e53e3e' : '#a0aec0',
+                                font: (ctx) => (ctx.tick && ctx.tick.value === 37.5) ? { weight: 'bold', size: 10 } : { size: 9 },
+                                callback: (v) => v === 37.5 ? '37.5' : v
+                            },
+                            grid: {
+                                color: (ctx) => (ctx.tick && ctx.tick.value === 37.5) ? 'rgba(229, 62, 62, 0.2)' : 'rgba(0,0,0,0.03)',
+                                lineWidth: (ctx) => (ctx.tick && ctx.tick.value === 37.5) ? 1.5 : 1
+                            }
+                        },
+                        x: { ticks: { font: { size: 8 }, color: '#a0aec0' }, grid: { display: false } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        },
+
+        addTempRecord: function() {
+            const d = document.getElementById('record-date').value;
+            const t = parseFloat(document.getElementById('record-temp').value);
+            if (!d || isNaN(t)) return;
+            const ev = this.events.find(e => e.id == this.currentEventId);
+            ev.records.push({ id: Date.now(), date: d, temp: t });
+            ev.records.sort((a, b) => new Date(a.date) - new Date(b.date));
+            this.save();
+            this.renderDetail();
+            document.getElementById('record-temp').value = '';
+        },
+        deleteCurrentEvent: function() {
+            if (!confirm("このイベントを完全に削除しますか？")) return;
+            this.events = this.events.filter(e => e.id != this.currentEventId);
+            this.save();
+            this.navigate('page-list');
+        },
+        deleteEventFromList: function(id) {
+            if (!confirm("このイベントを削除しますか？")) return;
+            this.events = this.events.filter(e => e.id != id);
+            this.save();
+            this.renderList();
+        },
+        renameEvent: function() {
+            const ev = this.events.find(e => e.id == this.currentEventId);
+            const n = prompt("名前を変更", ev.name);
+            if (n) { ev.name = n; this.save(); this.renderDetail(); }
+        },
+        openEdit: function(id) {
+            const ev = this.events.find(e => e.id == this.currentEventId);
+            const r = ev.records.find(rc => rc.id == id);
+            this.editingRecordId = id;
+            document.getElementById('edit-date').value = r.date;
+            document.getElementById('edit-temp').value = r.temp;
+            document.getElementById('edit-modal').style.display = 'flex';
+        },
+        closeModal: function() { document.getElementById('edit-modal').style.display = 'none'; },
+        saveEdit: function() {
+            const ev = this.events.find(e => e.id == this.currentEventId);
+            const r = ev.records.find(rc => rc.id == this.editingRecordId);
+            r.date = document.getElementById('edit-date').value;
+            r.temp = parseFloat(document.getElementById('edit-temp').value);
+            ev.records.sort((a,b) => new Date(a.date) - new Date(b.date));
+            this.save(); this.renderDetail(); this.closeModal();
+        },
+        deleteRecord: function(id) {
+            const ev = this.events.find(e => e.id == this.currentEventId);
+            ev.records = ev.records.filter(rc => rc.id != id);
+            this.save(); this.renderDetail();
+        }
+    };
+
+    window.onload = function() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('record-date').value = now.toISOString().slice(0, 16);
+        app.renderList();
+    };
+</script>
+</body>
+</html>
+
