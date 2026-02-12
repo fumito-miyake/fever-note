@@ -1,7 +1,8 @@
 {
   "name": "みんなの体温記録",
   "short_name": "体温記録",
-  "start_url": "/fever-note/",
+  "start_url": "./",
+  "scope": "./"
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#317EFB",
