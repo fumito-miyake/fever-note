@@ -156,7 +156,10 @@
         <div class="card no-print">
             <div style="display: flex; gap: 8px;">
                 <input type="datetime-local" id="record-date" style="flex: 1.6;">
-                <input type="number" id="record-temp" step="0.1" placeholder="36.5" style="flex: 1;">
+                <div style="display:flex; gap:6px; flex:1;">
+                    <input type="text" id="record-temp" inputmode="numeric" maxlength="4" placeholder="36.5" style="flex: 1;">
+                    <button type="button" class="btn btn-sm btn-outline" style="width:70px;" onclick="app.openTempModal()">選択</button>
+                </div>
             </div>
             <button class="btn" id="add-record-btn" onclick="app.addTempRecord()">記録を追加</button>
         </div>
@@ -576,8 +579,31 @@
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         document.getElementById('record-date').value = now.toISOString().slice(0, 16);
         app.renderList();
+        
+        // 体温入力フォーマット制御
+        document.addEventListener('input', function(e){
+            if(e.target && e.target.id === 'record-temp'){
+                let v = e.target.value.replace(/[^0-9.]/g,''); // 数字とピリオド以外除去
+        
+                // ピリオドは1つまで
+                const parts = v.split('.');
+        
+                if(parts.length > 2){
+                    v = parts[0] + '.' + parts[1];
+                }
+
+                // 数字3桁入力されたら自動フォーマット
+                const digits = v.replace('.', '');
+        
+                if(digits.length === 3){
+                    v = digits.slice(0,2) + '.' + digits.slice(2);
+                }
+                e.target.value = v;
+            }
+        });
     };
 </script>
 </body>
 </html>
+
 
