@@ -1,9 +1,10 @@
 const CACHE_NAME = "fever-note-pwa-cache-v1";
 const urlsToCache = [
   "./",
+  "./manifest.json",
   "./index.html",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/fever-note-192.png",
+  "./icons/fever-note-512.png"
 ];
 
 self.addEventListener("install", event => {
